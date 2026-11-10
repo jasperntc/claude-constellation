@@ -13,7 +13,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc && node -e \"require('fs').cpSync('site','dist/site',{recursive:true,filter:f=>!f.endsWith('.ts')})\"",
+    "build": "tsc && node scripts/copy-site.mjs",
     "prepare": "npm run build",
     "typecheck": "tsc --noEmit",
     "test": "node --test \"src/**/*.test.ts\"",
@@ -23,6 +23,7 @@
   "devDependencies": {
     "@types/node": "^24.10.0",
     "@types/three": "0.170.0",
+    "three": "0.170.0",
     "typescript": "~6.0.3"
   },
   "engines": {
