@@ -50,14 +50,20 @@ function validate(raw: unknown): Session[] {
   const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 0);
   const date = (v: unknown): v is string => typeof v === 'string' && !Number.isNaN(Date.parse(v));
   const out: Session[] = [];
+  // Times are re-written as ISO strings because the sky sorts them as text.
+  const iso = (v: string) => new Date(v).toISOString();
+  let budget = 50_000; // stars: past this the layout's spread calls and the GPU both give out
   for (const s of list.slice(0, 5000)) {
+    if (budget <= 0) break;
     if (!s || !date(s.start) || !date(s.end) || !Array.isArray(s.turns)) continue;
     const turns: Turn[] = s.turns.slice(0, 3000)
       .filter((x: any) => x && date(x.t) && n(x.tokens) > 0)
-      .map((x: any) => ({ t: x.t, tokens: n(x.tokens), output: n(x.output), tools: Math.min(n(x.tools), 5000) }));
+      .slice(0, budget)
+      .map((x: any) => ({ t: iso(x.t), tokens: n(x.tokens), output: n(x.output), tools: Math.min(n(x.tools), 5000) }));
     if (!turns.length) continue;
+    budget -= turns.length;
     out.push({
-      project: String(s.project ?? 'unknown').slice(0, 60), start: s.start, end: s.end, model: String(s.model ?? '').slice(0, 60),
+      project: String(s.project ?? 'unknown').slice(0, 60), start: iso(s.start), end: iso(s.end), model: String(s.model ?? '').slice(0, 60),
       input: n(s.input), output: n(s.output), cacheRead: n(s.cacheRead), cacheWrite: n(s.cacheWrite),
       tools: n(s.tools), prompts: n(s.prompts) || turns.length, turns,
     });
@@ -351,6 +357,8 @@ function build(sessions: Session[]) {
   const sSize = new Float32Array(N), sBirth = new Float32Array(N), sSeed = new Float32Array(N), sIdx = new Float32Array(N);
   const dPos: number[] = [], dCenter: number[] = [], dBirth: number[] = [], dSpeed: number[] = [], dCol: number[] = [];
   const r = rng(42);
+  // Dust thins out evenly on huge skies so the particle count stays drawable.
+  const dustScale = Math.min(1, 300_000 / stars.reduce((a, st) => a + Math.min(st.turn.tools, 120), 0) || 1);
   stars.forEach((st, i) => {
     const c = new THREE.Color(colorOf(st.session));
     sPos.set([st.pos.x, st.pos.y, st.pos.z], i * 3);
@@ -359,7 +367,7 @@ function build(sessions: Session[]) {
     sBirth[i] = birth(i);
     sSeed[i] = r();
     sIdx[i] = i;
-    const dust = Math.min(st.turn.tools, 120);
+    const dust = Math.round(Math.min(st.turn.tools, 120) * dustScale);
     const spread = 0.35 + 0.1 * Math.sqrt(dust);
     for (let k = 0; k < dust; k++) {
       const o = new THREE.Vector3(r() - 0.5, (r() - 0.5) * 0.5, r() - 0.5).normalize().multiplyScalar(spread * (0.5 + r()));

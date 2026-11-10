@@ -14,7 +14,7 @@ Needs Node 22.18 or later, and Claude Code transcripts on this machine.
 npx github:jasperntc/claude-constellation
 ```
 
-It reads `~/.claude/projects`, then opens your sky on `http://localhost:4173`. The page and your numbers stay on your machine: the server listens on loopback only.
+It reads `~/.claude/projects`, then opens your sky on `http://localhost:4173`. Your numbers stay on your machine: the server listens on loopback only and refuses requests for any other host name, so a web page can't reach it through DNS rebinding. The only outside request is for the Google Fonts stylesheet.
 
 To share a sky, or view it on the demo site, write the totals to a file and drop it on the page:
 
@@ -55,12 +55,12 @@ Link parameters: `?t=0.5` opens at the halfway point with no intro, `?focus=<pro
 
 - **Extractor** (`src/extract.ts`, `src/cli.ts`): streams each JSONL transcript line by line. Claude Code streams one API response as several lines that repeat the same `usage`, so tokens are counted once per message id while tool calls are counted per line. Subagent transcripts add their cost to the prompt that was active when they ran.
 - **Sky** (`site/app.ts`): three.js with custom point shaders (stars, twinkle, ignition flare, orbiting dust), bloom, and HTML labels. Layout is seeded by project name, so your sky looks the same every time. Projects sit on a sunflower spiral spaced by the largest cluster so none overlap. Inside a project, prompts take a random walk pulled back to their session's centre, so long sessions form dense knots.
-- **No bundler**: TypeScript compiles straight to ES modules, and three.js loads from a CDN through an import map.
+- **No bundler**: TypeScript compiles straight to ES modules. The build copies the exact three.js files the page imports into `vendor/`, and an import map points at them, so no third-party script runs and the page works offline.
 - **Accessibility**: respects reduced motion (no intro, rotation or twinkle), keyboard-reachable controls, and a dropped file is validated and rendered as text only.
 
 ```bash
 npm install
-npm test         # extractor tests (node:test)
+npm test         # extractor and local server tests (node:test)
 npm run build    # compile to dist/
 npm start        # your sky on :4173
 npm run demo     # demo sky on :4173
