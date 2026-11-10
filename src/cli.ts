@@ -7,6 +7,7 @@ import { createInterface } from 'node:readline';
 import { spawn } from 'node:child_process';
 import { parseArgs } from 'node:util';
 import { addLine, newAcc, toSession, type Acc, type Session, type Sky } from './extract.ts';
+import { repoName } from './repo.ts';
 
 const fail = (msg: string): never => { console.error(msg); process.exit(1); };
 
@@ -69,7 +70,7 @@ async function extract(root: string): Promise<Session[]> {
       await readLines(file, acc, false);
       // Subagent transcripts live in <session id>/subagents/ and add to their parent session's cost.
       for (const sub of jsonl(join(file.slice(0, -'.jsonl'.length), 'subagents'))) await readLines(sub, acc, true);
-      const s = toSession(acc, fallback);
+      const s = toSession(acc, fallback, repoName);
       if (s) sessions.push(s);
     }
   }

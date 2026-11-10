@@ -28,7 +28,8 @@ export type Sky = { generatedAt: string; sessions: Session[] };
 type Spend = { t: string; tokens: number; output: number; tools: number };
 
 export type Acc = {
-  cwd?: string;
+  cwd?: string; // the latest folder seen; tokens are credited to it
+  cwdTokens: Map<string, number>;
   start?: string;
   end?: string;
   seen: Set<string>;
@@ -43,7 +44,7 @@ export type Acc = {
 };
 
 export const newAcc = (): Acc => ({
-  seen: new Set(), models: new Map(), input: 0, output: 0, cacheRead: 0, cacheWrite: 0, turns: [], prompts: 0, sub: [],
+  seen: new Set(), models: new Map(), cwdTokens: new Map(), input: 0, output: 0, cacheRead: 0, cacheWrite: 0, turns: [], prompts: 0, sub: [],
 });
 
 /** Last folder of the launch directory. Worktrees count as their parent repo; scratch folders collapse to one. */
@@ -63,7 +64,7 @@ function spend(acc: Acc, s: Spend, sidechain: boolean) {
   turn.tokens += s.tokens; turn.output += s.output; turn.tools += s.tools;
 }
 
-/** sidechain: the line comes from a subagent transcript, which adds cost but not prompts or the cwd. */
+/** sidechain: the line comes from a subagent transcript, which adds cost but not prompts. */
 export function addLine(acc: Acc, line: string, sidechain = false): void {
   let e: any;
   try { e = JSON.parse(line); } catch { return; } // a session still being written can end mid-line
@@ -71,7 +72,7 @@ export function addLine(acc: Acc, line: string, sidechain = false): void {
   const t: string = e.timestamp;
   if (!acc.start || t < acc.start) acc.start = t;
   if (!acc.end || t > acc.end) acc.end = t;
-  if (!sidechain && !acc.cwd && typeof e.cwd === 'string') acc.cwd = e.cwd;
+  if (typeof e.cwd === 'string') acc.cwd = e.cwd;
 
   const msg = e.message;
   if (!msg) return;
@@ -87,6 +88,7 @@ export function addLine(acc: Acc, line: string, sidechain = false): void {
     acc.seen.add(key);
     const [i, o, r, w] = [u.input_tokens, u.output_tokens, u.cache_read_input_tokens, u.cache_creation_input_tokens].map(num) as [number, number, number, number];
     acc.input += i; acc.output += o; acc.cacheRead += r; acc.cacheWrite += w;
+    if (acc.cwd) acc.cwdTokens.set(acc.cwd, (acc.cwdTokens.get(acc.cwd) ?? 0) + i + o + r + w);
     if (typeof msg.model === 'string' && msg.model !== '<synthetic>') {
       acc.models.set(msg.model, (acc.models.get(msg.model) ?? 0) + o + 1);
     }
@@ -98,7 +100,8 @@ export function addLine(acc: Acc, line: string, sidechain = false): void {
   }
 }
 
-export function toSession(acc: Acc, fallbackProject: string): Session | null {
+/** nameOf turns a folder into a project name; the CLI passes one that finds the folder's git repo. */
+export function toSession(acc: Acc, fallbackProject: string, nameOf: (cwd: string) => string = projectName): Session | null {
   const total = acc.input + acc.output + acc.cacheRead + acc.cacheWrite;
   if (!total || !acc.start || !acc.end) return null;
   for (const s of acc.sub) {
@@ -108,8 +111,14 @@ export function toSession(acc: Acc, fallbackProject: string): Session | null {
   }
   const turns = acc.turns.filter((x) => x.tokens > 0);
   const model = [...acc.models].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'unknown';
+  // A session can move between folders, so it belongs to the project where most of its tokens went.
+  // Scratch is where work starts, not what it's about: it only wins when nothing else was used.
+  const byName = new Map<string, number>();
+  for (const [cwd, n] of acc.cwdTokens) byName.set(nameOf(cwd), (byName.get(nameOf(cwd)) ?? 0) + n);
+  const project = [...byName].filter(([name]) => name !== 'scratch' || byName.size === 1)
+    .sort((a, b) => b[1] - a[1])[0]?.[0] ?? (acc.cwd ? nameOf(acc.cwd) : fallbackProject);
   return {
-    project: acc.cwd ? projectName(acc.cwd) : fallbackProject,
+    project,
     start: acc.start, end: acc.end, model,
     input: acc.input, output: acc.output, cacheRead: acc.cacheRead, cacheWrite: acc.cacheWrite,
     tools: turns.reduce((a, x) => a + x.tools, 0), prompts: acc.prompts, turns,
