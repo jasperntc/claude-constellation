@@ -4,6 +4,7 @@ Mistakes caught during review, mine and the AI's. Newest first.
 
 | Date | Where | Mistake | Caught by | Fix |
 |---|---|---|---|---|
+| 2026-11-10 | `src/extract.ts` | A session was named by the folder it started in, so this project's own build session, which started in the app's scratch folder, showed up as `scratch`. Subfolders like `site/` would have become their own projects. | You, looking at your own sky | Credit tokens to each folder, resolve folders to their git repo, and name the session after the repo with the most tokens. Scratch only wins when it's the only folder. |
 | 2026-11-10 | `src/cli.ts` | The local server answered any `Host` header, so a page using DNS rebinding could read your project names and totals. | Security audit, `curl` with a forged Host | Only `localhost:<port>` and `127.0.0.1:<port>` are served; others get 403. Regression test in `src/cli.test.ts`. |
 | 2026-11-10 | `src/cli.ts` | One malformed URL (`/%E0%A4%A`) threw in the request handler and killed the server; a directory path would have too. | Security audit, `curl` | Handler wrapped: bad URLs get 400, directories 404. Tested. |
 | 2026-11-10 | `src/cli.ts` | A bad `--port` or an unreadable transcript ended in a stack trace. | Security audit | Clear messages; an unreadable transcript is skipped with a warning. |

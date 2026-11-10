@@ -44,13 +44,13 @@ test('subagent spend lands on the prompt that was active when it ran', () => {
   assert.equal(s.tools, 3);
 });
 
-test('subagent lines add cost, not prompts or cwd; synthetic model is ignored', () => {
+test('subagent lines add cost but not prompts; synthetic model is ignored', () => {
   const acc = newAcc();
   addLine(acc, L({ type: 'user', cwd: '/x/sub', timestamp: '2026-11-01T09:00:00Z', message: { content: 'task' } }), true);
   addLine(acc, L({ type: 'assistant', timestamp: '2026-11-01T09:01:00Z', message: { id: 'a', model: 'claude-haiku-5-5', usage, content: [] } }), true);
   addLine(acc, L({ type: 'assistant', timestamp: '2026-11-01T09:02:00Z', message: { id: 'b', model: '<synthetic>', usage, content: [] } }), true);
   const s = toSession(acc, 'fallback');
-  assert.equal(s?.project, 'fallback');
+  assert.equal(s?.project, 'sub'); // a subagent's folder counts towards the session's project
   assert.equal(s?.prompts, 0);
   assert.equal(s?.model, 'claude-haiku-5-5');
   assert.equal(s?.output, 10);
@@ -60,4 +60,25 @@ test('a session with no tokens is dropped', () => {
   const acc = newAcc();
   addLine(acc, L({ type: 'user', cwd: '/x/repo', timestamp: '2026-11-01T10:00:00Z', message: { content: 'hi' } }));
   assert.equal(toSession(acc, 'f'), null);
+});
+
+test('a session that moves folders belongs where most tokens went; scratch only wins alone', () => {
+  const scratch = 'C:/Users/me/AppData/Claude/scratch-workspaces/a/b/scratch-1';
+  const line = (cwd: string, id: string, tokens: number) => L({ type: 'assistant', cwd, timestamp: '2026-11-01T10:00:00Z',
+    message: { id, model: 'claude-opus-5-5', usage: { input_tokens: tokens }, content: [] } });
+  const moved = newAcc();
+  addLine(moved, line(scratch, 'a', 900));
+  addLine(moved, line('/x/repo', 'b', 400));
+  addLine(moved, line('/x/repo/site', 'c', 300));
+  const nameOf = (cwd: string) => (cwd.startsWith('/x/repo') ? 'repo' : projectName(cwd));
+  assert.equal(toSession(moved, 'f', nameOf)?.project, 'repo', 'repo has 700 against scratch 900, but scratch never wins a contest');
+
+  const twoRepos = newAcc();
+  addLine(twoRepos, line('/x/one', 'a', 100));
+  addLine(twoRepos, line('/x/two', 'b', 300));
+  assert.equal(toSession(twoRepos, 'f')?.project, 'two');
+
+  const onlyScratch = newAcc();
+  addLine(onlyScratch, line(scratch, 'a', 100));
+  assert.equal(toSession(onlyScratch, 'f')?.project, 'scratch');
 });

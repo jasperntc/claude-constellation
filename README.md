@@ -35,7 +35,7 @@ The file loads into the browser tab. Nothing is uploaded.
 
 ## What leaves your transcripts
 
-Only totals: token counts, tool-call counts, timestamps, the model name and the project folder's name. No prompts, replies, code, file paths or session ids. The shape is in [`src/extract.ts`](src/extract.ts).
+Only totals: token counts, tool-call counts, timestamps, the model name and a project name. The project is the git repo (or, outside a repo, the folder) where most of a session's tokens went, so a session that moves between folders, or into a subfolder like `site/`, still lands in the right cluster. No prompts, replies, code, file paths or session ids. The shape is in [`src/extract.ts`](src/extract.ts).
 
 ## Reading the sky
 
