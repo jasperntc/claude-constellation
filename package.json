@@ -1,0 +1,31 @@
+{
+  "name": "claude-constellation",
+  "version": "0.1.0",
+  "description": "Your Claude Code sessions as a 3D night sky. Runs locally; only token totals leave your transcripts.",
+  "license": "MIT",
+  "author": "Jasper Ng",
+  "repository": "github:jasperntc/claude-constellation",
+  "type": "module",
+  "bin": {
+    "claude-constellation": "dist/src/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc && node -e \"require('fs').cpSync('site','dist/site',{recursive:true,filter:f=>!f.endsWith('.ts')})\"",
+    "prepare": "npm run build",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"src/**/*.test.ts\"",
+    "start": "node dist/src/cli.js",
+    "demo": "node dist/src/cli.js --demo"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "@types/three": "0.170.0",
+    "typescript": "~6.0.3"
+  },
+  "engines": {
+    "node": ">=22.18"
+  }
+}

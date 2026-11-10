@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Claude Constellation</title>
+  <meta name="description" content="Every star is a prompt sent to Claude Code. The dust around it is the tool calls Claude made to answer it.">
+  <meta name="theme-color" content="#04050a">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2l3 11 11 3-11 3-3 11-3-11-11-3 11-3z' fill='%23ffb547'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <canvas id="sky" aria-label="A 3D sky of Claude Code sessions. Drag to orbit, scroll to zoom, hover a star for its numbers."></canvas>
+
+  <header class="hud hud-top">
+    <div class="brand">
+      <p class="eyebrow"><span class="spark" aria-hidden="true">✦</span> Claude Constellation</p>
+      <h1>Every star is a prompt.</h1>
+      <p class="lede">The dust around it is the tool calls Claude made to answer it. Lines join the prompts of one session; each cluster is a project.</p>
+    </div>
+    <dl class="stats" aria-live="off">
+      <div><dt>Projects</dt><dd id="s-projects">0</dd></div>
+      <div><dt>Sessions</dt><dd id="s-sessions">0</dd></div>
+      <div><dt>Prompts</dt><dd id="s-prompts">0</dd></div>
+      <div><dt>Tool calls</dt><dd id="s-tools">0</dd></div>
+      <div><dt>Tokens</dt><dd id="s-tokens">0</dd></div>
+    </dl>
+  </header>
+
+  <aside class="hud hud-side">
+    <ul class="legend" id="legend" aria-label="Star colour is the model"></ul>
+    <div class="actions">
+      <label class="btn" for="file">Load your sky<input id="file" type="file" accept=".json,application/json" hidden></label>
+      <button class="btn ghost" id="reset" type="button">Reset view <kbd>R</kbd></button>
+    </div>
+  </aside>
+
+  <footer class="hud hud-bottom">
+    <button class="play" id="play" type="button" aria-label="Pause">❚❚</button>
+    <div class="track">
+      <input id="time" type="range" min="0" max="1000" value="0" aria-label="Timeline">
+      <div class="track-meta">
+        <span id="date">—</span>
+        <span id="mode" class="mode"></span>
+      </div>
+    </div>
+  </footer>
+
+  <div id="tip" class="tip" role="tooltip" hidden></div>
+  <div id="drop" class="drop" hidden><p>Drop your <code>constellation.json</code><br><small>It stays in this tab. Nothing is uploaded.</small></p></div>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <noscript><p class="noscript">This sky needs JavaScript and WebGL.</p></noscript>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
