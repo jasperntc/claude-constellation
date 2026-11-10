@@ -14,7 +14,7 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 const params = new URLSearchParams(location.search);
 // ?embed is the sky with no controls or HUD, for an iframe such as a portfolio hero.
 const embed = params.has('embed');
-if (embed) document.body.classList.add('embed');
+// (index.html sets the .embed class itself, before any script loads, so the HUD stays hidden even if this file fails.)
 // ?t=0..1 opens the sky at that point in time, still, with no intro: for links, embeds and screenshots.
 const fixedT = params.has('t') ? Math.min(1, Math.max(0, Number(params.get('t')) || 0)) : null;
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -421,7 +421,7 @@ function build(sessions: Session[]) {
   const box = new THREE.Box3().setFromPoints(stars.map((s) => s.pos));
   const sphere = box.getBoundingSphere(new THREE.Sphere());
   // Narrow screens need to back off further so the sky's width still fits.
-  const dist = Math.max(30, sphere.radius * 1.15) * Math.max(1, 1.4 / camera.aspect) * (embed ? 1.2 : 1);
+  const dist = Math.max(30, sphere.radius * 1.15) * Math.max(1, 1.4 / camera.aspect) * (embed ? 1.5 : 1);
   // Aim a little low so the sky sits above the timeline bar.
   const aim = sphere.center.clone().add(new THREE.Vector3(0, embed ? 0 : -dist * 0.12, 0));
   home = { target: aim, pos: aim.clone().add(new THREE.Vector3(0, dist * 0.4, dist)) };
