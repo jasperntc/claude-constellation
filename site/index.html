@@ -57,6 +57,29 @@
     </div>
   </footer>
 
+  <aside id="replay" class="replay" aria-label="Session replay" hidden>
+    <header class="r-head">
+      <div class="r-titles">
+        <p class="eyebrow"><span aria-hidden="true">▶</span> Replay</p>
+        <p class="r-title" id="r-title"></p>
+        <p class="r-sub" id="r-sub"></p>
+      </div>
+      <div class="r-actions">
+        <button class="r-btn" id="r-reel" type="button" aria-pressed="false" title="Portrait layout for screen recording">9:16</button>
+        <button class="r-btn" id="r-close" type="button" aria-label="Close replay">✕</button>
+      </div>
+    </header>
+    <ol class="r-log" id="r-log"></ol>
+    <footer class="r-foot">
+      <button class="play" id="r-play" type="button" aria-label="Pause replay">❚❚</button>
+      <div class="track">
+        <input id="r-time" type="range" min="0" max="0" value="0" aria-label="Replay position">
+        <div class="track-meta"><span id="r-count"></span><span>Secrets, emails and your home path are masked</span></div>
+      </div>
+      <button class="r-btn" id="r-speed" type="button" aria-label="Replay speed">1×</button>
+    </footer>
+  </aside>
+
   <div id="tip" class="tip" role="tooltip" hidden></div>
   <div id="drop" class="drop" hidden><p>Drop your <code>constellation.json</code><br><small>It stays in this tab. Nothing is uploaded.</small></p></div>
   <div id="toast" class="toast" role="status" hidden></div>

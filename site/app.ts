@@ -6,14 +6,20 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import type { Session, Sky, Turn } from '../src/extract.ts';
+import type { ReplayEvent } from '../src/replay.ts';
+import { openReplay } from './replay.ts';
+import { demoReplay } from './demo-replay.ts';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const params = new URLSearchParams(location.search);
+// ?embed is the sky with no controls or HUD, for an iframe such as a portfolio hero.
+const embed = params.has('embed');
+if (embed) document.body.classList.add('embed');
 // ?t=0..1 opens the sky at that point in time, still, with no intro: for links, embeds and screenshots.
 const fixedT = params.has('t') ? Math.min(1, Math.max(0, Number(params.get('t')) || 0)) : null;
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const still = reduced || fixedT !== null;
-const PLAY_SECONDS = 18;
+const PLAY_SECONDS = embed ? 7 : 18; // a hero has seconds, not minutes, of attention
 
 // ---------- small helpers
 
@@ -66,6 +72,7 @@ function validate(raw: unknown): Session[] {
       project: String(s.project ?? 'unknown').slice(0, 60), start: iso(s.start), end: iso(s.end), model: String(s.model ?? '').slice(0, 60),
       input: n(s.input), output: n(s.output), cacheRead: n(s.cacheRead), cacheWrite: n(s.cacheWrite),
       tools: n(s.tools), prompts: n(s.prompts) || turns.length, turns,
+      ...(typeof s.key === 'string' && /^\d{1,6}$/.test(s.key) ? { key: s.key } : {}),
     });
   }
   if (!out.length) throw new Error('That file has no sessions with tokens in it.');
@@ -117,6 +124,7 @@ const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
 controls.dampingFactor = 0.06;
 controls.autoRotate = !still;
+controls.enabled = !embed; // an embedded sky must not trap the host page's scroll
 controls.autoRotateSpeed = 0.25;
 controls.minDistance = 4;
 controls.maxDistance = 900;
@@ -413,9 +421,9 @@ function build(sessions: Session[]) {
   const box = new THREE.Box3().setFromPoints(stars.map((s) => s.pos));
   const sphere = box.getBoundingSphere(new THREE.Sphere());
   // Narrow screens need to back off further so the sky's width still fits.
-  const dist = Math.max(30, sphere.radius * 1.15) * Math.max(1, 1.4 / camera.aspect);
+  const dist = Math.max(30, sphere.radius * 1.15) * Math.max(1, 1.4 / camera.aspect) * (embed ? 1.2 : 1);
   // Aim a little low so the sky sits above the timeline bar.
-  const aim = sphere.center.clone().add(new THREE.Vector3(0, -dist * 0.12, 0));
+  const aim = sphere.center.clone().add(new THREE.Vector3(0, embed ? 0 : -dist * 0.12, 0));
   home = { target: aim, pos: aim.clone().add(new THREE.Vector3(0, dist * 0.4, dist)) };
   controls.target.copy(home.target);
   camera.position.copy(home.pos).multiplyScalar(still ? 1 : 1.8);
@@ -527,7 +535,9 @@ function showTip(st: Star, e: PointerEvent) {
     <div><b>${fmt(st.turn.output)}</b> written · <b>${st.turn.tools}</b> tool call${st.turn.tools === 1 ? '' : 's'}</div>
     <div>${day(st.turn.t)}, ${time(st.turn.t)}</div>
     <div>Prompt <b>${k}</b> of ${st.session.turns.length} in a <b>${span(Date.parse(st.session.end) - Date.parse(st.session.start))}</b> session</div>
-    <div>Session cache hits <b>${Math.round(cache * 100)}%</b></div>`;
+    <div>Session cache hits <b>${Math.round(cache * 100)}%</b></div>
+    <div class="t-hint">${controls.target.distanceTo(st.project.center) > 1 ? 'Click to fly here'
+      : canReplay(st) ? 'Click to replay this session' : 'Replays need the local CLI'}</div>`;
   tip.querySelector('.t-head span')!.textContent = `${st.project.name} · ${f.name}`; // project names come from files: text only
   tip.hidden = false;
   const w = tip.offsetWidth, h = tip.offsetHeight;
@@ -536,6 +546,7 @@ function showTip(st: Star, e: PointerEvent) {
   uniforms.uHover.value = st.index;
 }
 canvas.addEventListener('pointermove', (e) => {
+  if (document.body.classList.contains('replaying')) return; // the replay owns the highlighted star
   if (e.buttons) return hideTip();
   const st = pick(e);
   st ? showTip(st, e) : hideTip();
@@ -547,9 +558,40 @@ canvas.addEventListener('pointerup', (e) => {
   if (!downAt || Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 6) return;
   const st = pick(e);
   if (!st) return hideTip();
-  // First tap flies to the project; once there, a tap shows the numbers (touch screens have no hover).
-  if (controls.target.distanceTo(st.project.center) > 1) { hideTip(); flyTo(st.project); } else showTip(st, e);
+  // First tap flies to the project; once there, a tap replays that session (or shows the numbers if it can't).
+  if (controls.target.distanceTo(st.project.center) > 1) { hideTip(); flyTo(st.project); }
+  else if (canReplay(st)) { hideTip(); replay(st); }
+  else showTip(st, e);
 });
+
+// ---------- replays
+
+let source: 'demo' | 'yours' | 'file' | 'public' = 'demo';
+const canReplay = (st: Star) => !embed && (source === 'demo' || (source === 'yours' && !!st.session.key));
+
+async function replay(st: Star) {
+  let events: ReplayEvent[];
+  if (source === 'demo') {
+    events = demoReplay(st.session, hash(st.session.project + st.session.start));
+  } else {
+    try {
+      const res = await fetch(`./replay/${st.session.key}.json`, { cache: 'no-store' });
+      const body: unknown = res.ok ? await res.json() : null;
+      if (!Array.isArray(body)) throw new Error();
+      events = body as ReplayEvent[];
+    } catch {
+      return toast('Could not load that replay. Is the local CLI still running?');
+    }
+  }
+  const own = stars.filter((s) => s.session === st.session); // in time order
+  openReplay({
+    session: st.session, events, startAt: st.turn.t,
+    title: `${st.project.name} · ${family(st.session.model).name}`,
+    // Light up the prompt the replay has reached.
+    onMove: (e) => { uniforms.uHover.value = (own.findLast((s) => s.turn.t <= e.t) ?? own[0])!.index; },
+    onClose: () => { uniforms.uHover.value = -1; },
+  });
+}
 
 // ---------- loading data
 
@@ -560,15 +602,21 @@ const toast = (msg: string) => {
   clearTimeout((toast as any).timer);
   (toast as any).timer = setTimeout(() => (t.hidden = true), 6000);
 };
-function setMode(kind: 'demo' | 'yours', note = '') {
+function setMode(kind: typeof source) {
+  source = kind;
   const m = $('mode');
   m.className = `mode ${kind}`;
-  m.textContent = kind === 'demo' ? 'Demo data · load your own →' : `Your sky · stays in this tab${note}`;
+  m.textContent = {
+    demo: 'Demo data · click a star twice to replay · load your own →',
+    yours: 'Your sky · local only · click a star twice to replay',
+    file: 'Loaded file · stays in this tab',
+    public: 'Public sky · totals only',
+  }[kind];
 }
 async function loadFile(file: File) {
   try {
     build(validate(JSON.parse(await file.text())));
-    setMode('yours');
+    setMode('file');
   } catch (err) {
     toast(err instanceof Error ? err.message : 'Could not read that file.');
   }
@@ -588,6 +636,14 @@ addEventListener('drop', (e) => {
 });
 
 async function start() {
+  // ?sky=<name> shows a published totals file from ./skies/, such as the portfolio hero's.
+  const name = params.get('sky');
+  if (name && /^[a-z0-9-]{1,40}$/.test(name)) {
+    try {
+      const res = await fetch(`./skies/${name}.json`);
+      if (res.ok) { build(validate(await res.json())); setMode('public'); return; }
+    } catch { /* fall through to the demo */ }
+  }
   // The local CLI serves your totals at ./sessions.json; GitHub Pages has none, so it shows the demo.
   if (!params.has('demo')) {
     try {

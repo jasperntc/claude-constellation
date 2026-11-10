@@ -8,6 +8,7 @@ import { spawn } from 'node:child_process';
 import { parseArgs } from 'node:util';
 import { addLine, newAcc, toSession, type Acc, type Session, type Sky } from './extract.ts';
 import { repoName } from './repo.ts';
+import { buildReplay, makeRedact, type ReplayEvent } from './replay.ts';
 
 const fail = (msg: string): never => { console.error(msg); process.exit(1); };
 
@@ -59,6 +60,8 @@ async function readLines(file: string, acc: Acc, sidechain: boolean) {
 const jsonl = (dir: string) =>
   existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.jsonl')).map((f) => join(dir, f)) : [];
 
+const fileOf = new Map<Session, string>(); // where each session's transcript lives, for replays
+
 async function extract(root: string): Promise<Session[]> {
   const sessions: Session[] = [];
   for (const folder of readdirSync(root, { withFileTypes: true })) {
@@ -71,7 +74,7 @@ async function extract(root: string): Promise<Session[]> {
       // Subagent transcripts live in <session id>/subagents/ and add to their parent session's cost.
       for (const sub of jsonl(join(file.slice(0, -'.jsonl'.length), 'subagents'))) await readLines(sub, acc, true);
       const s = toSession(acc, fallback, repoName);
-      if (s) sessions.push(s);
+      if (s) { sessions.push(s); fileOf.set(s, file); }
     }
   }
   return sessions.sort((a, b) => a.start.localeCompare(b.start));
@@ -84,6 +87,11 @@ const TYPES: Record<string, string> = {
 
 function serve(sky: Sky | null) {
   const site = resolve(import.meta.dirname, '..', 'site');
+  // The local page gets a key per session so it can ask for that session's replay; --out files never carry keys.
+  const files = sky?.sessions.map((s) => fileOf.get(s)) ?? [];
+  const served = sky && JSON.stringify({ ...sky, sessions: sky.sessions.map((s, i) => ({ ...s, key: String(i) })) });
+  const mask = makeRedact(homedir());
+  const replays = new Map<string, string>();
   const hosts = new Set([`localhost:${port}`, `127.0.0.1:${port}`]);
   const server = createServer((req, res) => {
     // DNS rebinding guard: a web page that points its own hostname at 127.0.0.1 still sends its own Host header.
@@ -92,8 +100,19 @@ function serve(sky: Sky | null) {
     try {
       const path = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname);
       if (path === '/sessions.json') {
-        if (!sky) return void res.writeHead(404, headers).end();
-        return void res.writeHead(200, { ...headers, 'content-type': TYPES['.json']! }).end(JSON.stringify(sky));
+        if (!served) return void res.writeHead(404, headers).end();
+        return void res.writeHead(200, { ...headers, 'content-type': TYPES['.json']! }).end(served);
+      }
+      const replay = /^\/replay\/(\d{1,6})\.json$/.exec(path);
+      if (replay) {
+        const file = files[Number(replay[1])];
+        if (!file) return void res.writeHead(404, headers).end();
+        let body = replays.get(file);
+        if (!body) {
+          const events: ReplayEvent[] = buildReplay(readFileSync(file, 'utf8').split('\n'), mask);
+          replays.set(file, (body = JSON.stringify(events)));
+        }
+        return void res.writeHead(200, { ...headers, 'content-type': TYPES['.json']! }).end(body);
       }
       const file = resolve(site, '.' + (path.endsWith('/') ? path + 'index.html' : path));
       if (!file.startsWith(site + sep) || !existsSync(file) || !statSync(file).isFile()) return void res.writeHead(404, headers).end('Not found');
