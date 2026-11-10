@@ -21,6 +21,7 @@ export type Session = {
   tools: number;
   prompts: number;
   turns: Turn[];
+  key?: string; // set only by the local server, to fetch this session's replay
 };
 
 export type Sky = { generatedAt: string; sessions: Session[] };

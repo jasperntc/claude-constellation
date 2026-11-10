@@ -138,3 +138,78 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border: 0; bord
   .spark { animation: none; }
   .label { transition: none; }
 }
+
+/* ---------- replay panel */
+.tip .t-hint { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); color: var(--amber); }
+
+.replay {
+  position: fixed; z-index: 4; top: var(--gut); right: var(--gut); bottom: var(--gut);
+  width: min(460px, calc(100% - 2 * var(--gut)));
+  display: flex; flex-direction: column;
+  border: 1px solid var(--line); background: rgba(6, 8, 14, .9); backdrop-filter: blur(14px);
+}
+.replaying .hud-side, .replaying .hud-top .stats { display: none; }
+.r-head { display: flex; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.r-title { margin: 0; font: 400 24px/1.1 var(--serif); }
+.r-sub { margin: 4px 0 0; font: 11px/1.4 var(--mono); color: var(--dim); }
+.r-actions { display: flex; gap: 6px; align-items: flex-start; }
+.r-btn {
+  font: 500 12px/1 var(--mono); color: var(--ink); background: transparent; border: 1px solid var(--line);
+  padding: 8px 10px; cursor: pointer; min-width: 36px;
+}
+.r-btn:hover, .r-btn[aria-pressed="true"] { border-color: var(--amber); color: var(--amber); }
+.r-btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+.r-log { list-style: none; margin: 0; padding: 14px 16px; overflow-y: auto; flex: 1; display: grid; gap: 10px; align-content: start; scroll-behavior: smooth; }
+.r-ev { font-size: 13px; line-height: 1.5; animation: r-in .25s ease-out; }
+.r-who { display: block; font: 500 10px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--dim); margin-bottom: 4px; }
+.r-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.r-prompt { border-left: 2px solid var(--amber); padding: 2px 0 2px 10px; }
+.r-prompt .r-who { color: var(--amber); }
+.r-prompt .r-text { font: 400 17px/1.35 var(--serif); }
+.r-tool { border: 1px solid var(--line); background: rgba(255, 255, 255, .025); }
+.r-tool-head { display: flex; gap: 8px; align-items: baseline; padding: 7px 10px; font: 12px/1.4 var(--mono); min-width: 0; }
+.r-tool-head b { color: var(--amber); font-weight: 500; flex: none; }
+.r-tool-head span { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.r-body, .r-diff, .r-out {
+  margin: 0; padding: 8px 10px; font: 11.5px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere;
+  max-height: 220px; overflow: auto; border-top: 1px solid var(--line);
+}
+.r-del { color: #ff8a7a; background: rgba(255, 90, 70, .08); display: block; }
+.r-add { color: #8be3a9; background: rgba(80, 220, 130, .08); display: block; }
+.r-result .r-out { border: 0; padding: 0 10px; color: var(--dim); }
+.r-result.r-error .r-out { color: #ff8a7a; }
+.r-empty { color: var(--dim); }
+.r-foot { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--line); }
+.r-foot .track-meta span:last-child { text-align: right; }
+@keyframes r-in { from { opacity: 0; transform: translateY(4px); } }
+
+/* 9:16: a portrait column over the sky, sized for a phone screen recording */
+.reel .hud, .reel .label { display: none !important; }
+.reel .replay {
+  top: 0; bottom: 0; left: 50%; right: auto; transform: translateX(-50%);
+  height: 100dvh; width: min(100vw, calc(100dvh * 9 / 16));
+  background: linear-gradient(180deg, rgba(4, 5, 10, .55), rgba(4, 5, 10, .9) 35%);
+  border-top: 0; border-bottom: 0;
+}
+.reel .r-log { font-size: 15px; }
+.reel .r-prompt .r-text { font-size: 22px; }
+
+/* ---------- embed (portfolio hero): just the sky */
+.embed .hud, .embed .tip, .embed .drop, .embed .toast { display: none !important; }
+.embed #sky, .embed .label { pointer-events: none !important; cursor: default; }
+.embed .label small { display: none; }
+
+@media (max-width: 860px) {
+  .replay { top: auto; height: 72dvh; left: 0; right: 0; bottom: 0; width: 100%; border-left: 0; border-right: 0; }
+  .r-foot .track-meta span:last-child { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .r-ev { animation: none; }
+  .r-log { scroll-behavior: auto; }
+}
+#r-count { white-space: nowrap; }
+.reel .r-foot .track-meta span:last-child { display: none; }
+/* Grid items default to min-width: auto, so one long unbreakable summary would widen the whole log. */
+.r-log { grid-template-columns: minmax(0, 1fr); overflow-x: hidden; }
+.r-ev { min-width: 0; }
